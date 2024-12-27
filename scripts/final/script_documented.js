@@ -15,7 +15,7 @@ var END = START.advance(20, 'day');
 
 /* 
 *******************************
-* Detailed Documentationsh
+* Detailed Documentation
 START: Defines the starting date for the analysis as August 3, 2023.
 END: Defines the end date by advancing 20 days from the start date, setting the range to end on August 23, 2023.
 *******************************
