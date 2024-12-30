@@ -1,260 +1,92 @@
-// Map.addLayer(image3.selfMask(), {
-//     palette: '#00e1d8'
-// }, 'Flood areas 3')
+// --- Load and Display Flood Areas ---
+Map.addLayer(image3.selfMask(), { palette: '#00e1d8' }, 'Flood areas 3');
+Map.addLayer(aug13.selfMask(), { palette: '#00008B' }, 'Flood areas 13');
+Map.addLayer(aug25.selfMask(), { palette: '#00e1d8' }, 'Flood areas 25');
 
-// Map.addLayer(aug13.selfMask(), {
-//     palette: '#00008B'
-// }, 'Flood areas 13')
+// --- Define Date Range ---
+var START = ee.Date('2023-08-03'); // Starting date for analysis
+var END = START.advance(20, 'day'); // Ending date (20 days after START)
 
-// Map.addLayer(aug25.selfMask(), {
-//     palette: '#00e1d8'
-// }, 'Flood areas 25')
+// --- Display Table Layer ---
+Map.addLayer(table, {}, 'table'); // Display the region of interest (ROI) defined by `table`
 
-var START = ee.Date('2023-08-03');
-var END = START.advance(20, 'day');
+// --- Load and Filter Precipitation Data ---
+var agg = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR") // Load ECMWF dataset
+    .select(['total_precipitation_sum', 'runoff_sum']) // Select required bands
+    .filterBounds(table) // Filter for the ROI
+    .filterDate(START, END); // Filter for the defined date range
 
-// Map.addLayer(image3.selfMask());
-// print(image3);
-
-// /*
-// constant
-// */
-
-// Map.addLayer(table, {}, 'table');
-
-var agg = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
-.select('total_precipitation_sum', 'runoff_sum')
-.filterBounds(table)
-.filterDate(START, END); // Define the date range you're interested in
-// print(agg)
-
-
+// Function to extract precipitation-related bands
 var extractPrecipitation = function(image) {
-  return image.select('total_precipitation_sum', 'runoff_sum'); // 'tp' is the total precipitation band
+  return image.select(['total_precipitation_sum', 'runoff_sum']); // Extract precipitation and runoff bands
 };
 
-// var runoff = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
-// .select('total_precipitation_sum')
-// .filterBounds(table)
-// .filterDate(START, END);
-
-// print(runoff)
-
-
-
-// This has zero elements in it.
-// var agg = prec
-// .filterBounds(table)
-// .filterDate('2023-07-02')
-// .select('total_precipitation'); // Define the date range you're interested in
-// print(agg);
-
-
-// This has over 5000 elements.
-// var agg = ee.ImageCollection('ECMWF/ERA5/DAILY')
-//                   .select('total_precipitation')
-//                   ;
-// print(agg);
-
-
-// var visTp = {
-//   min: 0.0,
-//   max: 0.1,
-//   palette: ['ffffff', '00ffff', '0080ff', 'da00ff', 'ffa400', 'ff0000']
-// };
-
-// Map.addLayer(
-//     agg.filter(ee.Filter.date('2023-07-15')), visTp,
-//     'Daily total precipitation sums');
-
-
-// // Map the function over the ImageCollection to extract precipitation bands
+// Map the function to the ImageCollection and clip to the ROI
 var precipCollection = agg.map(extractPrecipitation).toBands().clip(table);
-// print("Precip Collection", precipCollection);
 
-// var tps_20230803 = precipCollection.select("20230803_total_precipitation_sum");
+// --- Add Elevation and Terrain Data ---
+var elev = dem.clip(table); // Clip DEM data to the ROI for elevation
+var slope = ee.Terrain.slope(dem).clip(table); // Calculate and clip slope data
 
-// // // Add the layer to the map
-// Map.addLayer(tps_20230803, {palette: '000000'}, "tps");
+// Add elevation, slope, and other topographic indices (TPI) to the collection
+precipCollection = precipCollection
+    .addBands(elev, ['elevation'])
+    .addBands(slope, ['slope'])
+    .addBands(tpi_large, ['elevation'], false)
+    .addBands(tpi_small, ['elevation'], false);
 
-// // Center the map on the layer
-// Map.centerObject(tps_20230803);
-
-
-var elev = dem.clip(table);
-// print(elev)
-var slope = ee.Terrain.slope(dem).clip(table);
-// print(slope)
-
-// print(elev);
-precipCollection = precipCollection.addBands(elev, ['elevation']);
-precipCollection = precipCollection.addBands(slope, ['slope']);
-precipCollection = precipCollection.addBands(tpi_large, ['elevation'], false);
-precipCollection = precipCollection.addBands(tpi_small, ['elevation'], false);
-// print("Precip Collection", precipCollection);
-// print(srcImg);
-
-// // var dw = ee.ImageCollection('GOOGLE/DYNAMICWORLD/V1').filterDate('2023-01-01', '2023-08-01'); //.filterBounds(roi);
-// // var dwImage = ee.Image(dw.mosaic());//.clip(roi); print('DW ee. Image', dwImage);
-// // // // // Display the the classified image using the label band.
-
-// // var classification = dwImage.select('label').clip(table).select(['label'], ['lulc']);
-// // Map.addLayer(classification,{}, 'lulc');
-// print(lulc_computed);
-lulc_computed = lulc_computed.select(['label'], ['lulc']);
-
+// Add land use/land cover (LULC) data to the collection
+lulc_computed = lulc_computed.select(['label'], ['lulc']); // Rename 'label' band to 'lulc'
 precipCollection = precipCollection.addBands(lulc_computed, ['lulc'], false);
 
-var bands = precipCollection.bandNames();
+// --- Random Points for Sampling ---
+var randomPoints = ee.FeatureCollection.randomPoints(table, 10000); // Generate random points within ROI
 
-// print(bands);
-precipCollection = precipCollection.addBands(aug13, ['constant']);
-print(precipCollection);
-
-var label = 'constant';
-var randomPoints = ee.FeatureCollection.randomPoints(table, 10000);
-
+// Map through points and assign the value of the 'constant' band to each point
 randomPoints = randomPoints.map(function(feature) {
   var value = precipCollection.select('constant').reduceRegion({
-    reducer: ee.Reducer.first(), // Choose a reducer, 'first' will get the value at the first pixel within the point
-    geometry: ee.FeatureCollection(feature),
-    scale: 30 // Adjust scale as needed
+    reducer: ee.Reducer.first(), // Extract the first pixel value
+    geometry: feature.geometry(),
+    scale: 30 // Scale of analysis (30m)
   }).get('constant');
-
-  return feature.set('label', value); // Set the 'label' property to the value of band 'x'
+  return feature.set('label', value); // Set the label property to the constant value
 });
 
-
+// --- Generate Training Data ---
 var training = precipCollection.sampleRegions({
-  // Get the sample from the polygons FeatureCollection.
-  collection: randomPoints,
-  // Keep this list of properties from the polygons.
-  properties: ['label'],
-  // Set the scale to get Landsat pixels in the polygons.
-  scale: 30
+  collection: randomPoints, // Use the random points for sampling
+  properties: ['label'], // Include the 'label' property
+  scale: 30 // Sampling scale
 });
 
+// Map through training data and assign the 'constant' value to each feature
 training = training.map(function(feature) {
   var value = precipCollection.select('constant').reduceRegion({
-    reducer: ee.Reducer.first(), // Choose a reducer, 'first' will get the value at the first pixel within the point
-    geometry: ee.FeatureCollection(feature),
-    scale: 30 // Adjust scale as needed
+    reducer: ee.Reducer.first(),
+    geometry: feature.geometry(),
+    scale: 30
   }).get('constant');
-
-  return feature.set('label', value); // Set the 'label' property to the value of band 'x'
+  return feature.set('label', value);
 });
 
-// // Export.table.toDrive({
-// //   collection: training,
-// //   description: 'training_data_export',
-// //   fileFormat: 'GeoJSON',
-// //   // selectors: [] // Optional: select specific properties to include in the GeoJSON
-// // });
-
-// // print(training);
-// // Create an SVM classifier with custom parameters.
+// --- Train a Classifier ---
 var classifier = ee.Classifier.libsvm({
-  kernelType: 'RBF',
-  gamma: 0.5,
-  cost: 10
+  kernelType: 'RBF', // Radial Basis Function kernel
+  gamma: 0.5, // Kernel coefficient
+  cost: 10 // Regularization parameter
 });
 
-// // var classifier = ee.Classifier.smileRandomForest(10);
-// // Train the classifier. 
-var trained = classifier.train(training, 'constant', bands);
+// Train the classifier using training data
+var trained = classifier.train(training, 'constant', precipCollection.bandNames());
 
-var confusionMatrix = trained.confusionMatrix();
-print('Confusion Matrix:', confusionMatrix);
+// --- Evaluate Classifier Performance ---
+var confusionMatrix = trained.confusionMatrix(); // Generate confusion matrix
+print('Confusion Matrix:', confusionMatrix); // Print confusion matrix to evaluate accuracy
 
+// --- Classify Image ---
+var classified = precipCollection.select(precipCollection.bandNames()).classify(trained); // Classify the data
 
-// // print("Confusion Matrix", trained.confusionMatrix());
-// // Classify the image.
-var classified = precipCollection.select(bands).classify(trained);
-
-// var confusionMatrix = trained.confusionMatrix();
-// print('Confusion Matrix 2:', confusionMatrix);
-
-print(classified);
-Map.addLayer(classified.selfMask(),{palette : 'red'}, "classified");
-Map.addLayer(precipCollection.select('constant'), {}, "precipCollection");
-
-Map.addLayer(classified.selfMask(), {
-    palette: 'royalblue'
-}, 'Flood areas')
-
-// Export.classifier.toAsset(trained);
-// // Get the value from the dictionary
-// // var valueAtPoint = value.get('bandName');
-// var randomPoints1 = precipCollection.select('constant').sample({
-//   region: table,  // Use the image geometry as the region
-//   scale: 30,                  // Adjust scale as needed
-//   numPixels: 100        // Number of points to sample
-// });
-
-// var value = precipCollection.select('constant').reduceRegion({
-//   reducer: ee.Reducer.first(), // Choose a reducer, 'first' will get the value at the first pixel within the point
-//   geometry: geometry,
-//   scale: 30 // Adjust scale as needed
-// });
-
-// print(value);
-// // Get the value from the dictionary
-// var valueAtPoint = value.get('bandName');
-
-
-// print(randomPoints);
-
-// print(precipCollection.select(bands), "precipCollection.select(bands)");
-
-// var training = precipCollection.select(bands).sampleRegions({
-//   collection: randomPoints1,
-//   properties: ['label'], // Assuming your classes are labeled with the property 'class'
-//   scale: 30 // Adjust scale as needed
-// });
-
-
-// print('training', training);
-// // Train a classifier (e.g., Random Forest)
-// var classifier = ee.Classifier.smileCart().train({
-//   features : training,
-//   classProperty :  'constant',
-//   inputProperties : bands
-// });
-
-// print(classifier);
-// // // Apply the classifier to the entire study area
-// var classified =  precipCollection.classify(classifier, "output");
-
-// Map.addLayer(classified, {}, "classified");
-
-
-
-// var START = ee.Date('2023-07-25');
-// var END = START.advance(20, 'day');
-
-// /*
-// constant
-// */
-// var agg = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
-// .select(['total_precipitation_sum', 'runoff_sum'], ['prec', 'runoff'])
-// .filterBounds(table)
-// .filterDate(START, END); // Define the date range you're interested in
-
-// var extractPrecipitation = function(image) {
-//   return image.select(['prec', 'runoff']); // 'tp' is the total precipitation band
-// };
-
-// // Map the function over the ImageCollection to extract precipitation bands
-// var precipCollection = agg.map(extractPrecipitation).toBands().clip(table);
-
-// precipCollection = precipCollection.addBands(elev, ['elevation']);
-// precipCollection = precipCollection.addBands(tpi_large, ['elevation'], false);
-// precipCollection = precipCollection.addBands(tpi_small, ['elevation'], false);
-// precipCollection = precipCollection.addBands(lulc_computed, ['lulc'], false);
-
-// print(precipCollection);
-// var classified = precipCollection.select(bands).classify(trained);
-
-// print(classified);
-// Map.addLayer(classified,{}, "classified_25-07");
-
+// --- Display Results ---
+Map.addLayer(classified.selfMask(), { palette: 'red' }, "classified"); // Add classified result to the map
+Map.addLayer(classified.selfMask(), { palette: 'royalblue' }, 'Flood areas'); // Add another visualization for flood areas
+Map.addLayer(precipCollection.select('constant'), {}, "precipCollection"); // Display the collection
