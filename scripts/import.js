@@ -2,17 +2,17 @@
 
 // 'table' refers to a feature collection containing geometries for the area of interest.
 // This is likely used to define regions or boundaries for further analysis.
-var table = ee.FeatureCollection("projects/ee-atharv/assets/COL865/geometry_box_export"),
+var table = ee.FeatureCollection("projects/assets/COL865/geometry_box_export"),
 
 // 'dem' is a Digital Elevation Model (DEM) image from the USGS SRTM (Shuttle Radar Topography Mission).
 // It provides elevation data, useful for understanding terrain features like slopes, mountains, etc.
     dem = ee.Image("USGS/SRTMGL1_003"),
 
 // 'image2' is a flood image, likely captured from satellite or remote sensing, for flood analysis.
-    image2 = ee.Image("projects/ee-atharv/assets/flood_image_roi_export_1Aug_edition2"),
+    image2 = ee.Image("projects/assets/flood_image_roi_export_1Aug_edition2"),
 
 // 'image3' is another version of a flood image, possibly a refined or updated version for comparison.
-    image3 = ee.Image("projects/ee-atharv/assets/flood_image_roi_export_aug1_v3"),
+    image3 = ee.Image("projects/assets/flood_image_roi_export_aug1_v3"),
 
 // 'geometry' defines a complex geometry object consisting of both a point and a polygon.
 // The point is specified by its latitude and longitude, while the polygon is defined by a series of coordinates.
@@ -64,17 +64,17 @@ var table = ee.FeatureCollection("projects/ee-atharv/assets/COL865/geometry_box_
     lulc = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1"),
 
 // 'aug13' is a specific flood image for August 13, used for analysis at that point in time.
-    aug13 = ee.Image("projects/ee-atharv/assets/flood_image_roi_export_13aug"),
+    aug13 = ee.Image("projects/assets/flood_image_roi_export_13aug"),
 
 // 'aug25' is another flood image for August 25, representing a different time point for flood monitoring.
-    aug25 = ee.Image("projects/ee-atharv/assets/flood_image_roi_export_25Aug"),
+    aug25 = ee.Image("projects/assets/flood_image_roi_export_25Aug"),
 
 // 'tpi_large' represents a terrain ruggedness index (TPI) image for a large region.
 // TPI is used to measure the ruggedness of terrain, which can be useful for flood modeling, slope analysis, etc.
-    tpi_large = ee.Image("projects/ee-atharv/assets/TPI_large_roi"),
+    tpi_large = ee.Image("projects/assets/TPI_large_roi"),
 
 // 'tpi_small' represents a smaller region of the terrain ruggedness index (TPI), providing similar information but for a more localized area.
-    tpi_small = ee.Image("projects/ee-atharv/assets/COL865/TPI_small_region"),
+    tpi_small = ee.Image("projects/assets/COL865/TPI_small_region"),
 
 // 'imageCollection' is an image collection containing daily aggregated data from the ECMWF ERA5-LAND dataset.
 // This collection is likely used for temporal analysis of land variables such as temperature, precipitation, etc.
@@ -82,4 +82,4 @@ var table = ee.FeatureCollection("projects/ee-atharv/assets/COL865/geometry_box_
 
 // 'lulc_computed' represents a specific LULC image computed from the Dynamic World dataset,
 // showing the land use/land cover classification for a particular region or time.
-    lulc_computed = ee.Image("projects/ee-atharv/assets/COL865/lulc_dynamic_world");
+    lulc_computed = ee.Image("projects/assets/COL865/lulc_dynamic_world");
