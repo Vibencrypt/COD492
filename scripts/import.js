@@ -1,7 +1,6 @@
-// Define various input assets used in the analysis
+// This file defines various input assets used in the analysis.
 
-// 'table' refers to a feature collection containing geometries for the area of interest.
-// This is likely used to define regions or boundaries for further analysis.
+// 'table' refers to our region of interest.
 var table = ee.FeatureCollection("projects/assets/COL865/geometry_box_export"),
 
 // 'dem' is a Digital Elevation Model (DEM) image from the USGS SRTM (Shuttle Radar Topography Mission).
