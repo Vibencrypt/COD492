@@ -1,92 +1,116 @@
-// --- Load and Display Flood Areas ---
-Map.addLayer(image3.selfMask(), { palette: '#00e1d8' }, 'Flood areas 3');
-Map.addLayer(aug13.selfMask(), { palette: '#00008B' }, 'Flood areas 13');
-Map.addLayer(aug25.selfMask(), { palette: '#00e1d8' }, 'Flood areas 25');
+// This script performs comprehensive flood analysis by combining flood imagery, precipitation data,
+// elevation and terrain features, and land use/land cover (LULC) information. It generates training data,
+// trains a classifier, evaluates its performance, and visualizes results on a map.
+
+// --- Display Flood Areas ---
+// Add flood imagery layers to visualize the extent of flooding on different dates.
+// These layers help in identifying changes in flood coverage over time.
+Map.addLayer(image3.selfMask(), { palette: '#00e1d8' }, 'Flood areas 3'); // Flood extent from Image3 (updated version)
+Map.addLayer(aug13.selfMask(), { palette: '#00008B' }, 'Flood areas 13'); // Flood extent for August 13
+Map.addLayer(aug25.selfMask(), { palette: '#00e1d8' }, 'Flood areas 25'); // Flood extent for August 25
 
 // --- Define Date Range ---
-var START = ee.Date('2023-08-03'); // Starting date for analysis
-var END = START.advance(20, 'day'); // Ending date (20 days after START)
+// Specify the analysis period by defining a start date and an end date.
+// The analysis focuses on a 20-day window starting from August 3, 2023.
+var START = ee.Date('2023-08-03'); // Analysis start date
+var END = START.advance(20, 'day'); // Analysis end date (20 days later)
 
-// --- Display Table Layer ---
-Map.addLayer(table, {}, 'table'); // Display the region of interest (ROI) defined by `table`
+// --- Display Region of Interest (ROI) ---
+// Visualize the region of interest (ROI) defined by the `table` variable.
+// This helps in ensuring that the analysis is confined to the specified geographical area.
+Map.addLayer(table, {}, 'table'); // Add ROI to the map
 
 // --- Load and Filter Precipitation Data ---
-var agg = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR") // Load ECMWF dataset
-    .select(['total_precipitation_sum', 'runoff_sum']) // Select required bands
-    .filterBounds(table) // Filter for the ROI
-    .filterDate(START, END); // Filter for the defined date range
+// Load daily precipitation and runoff data from the ECMWF ERA5-LAND dataset.
+// Filter the dataset by the defined date range and the ROI.
+var agg = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR") // Historical weather data
+    .select(['total_precipitation_sum', 'runoff_sum']) // Use only precipitation and runoff bands
+    .filterBounds(table) // Restrict data to the ROI
+    .filterDate(START, END); // Limit data to the analysis period
 
-// Function to extract precipitation-related bands
-var extractPrecipitation = function(image) {
-  return image.select(['total_precipitation_sum', 'runoff_sum']); // Extract precipitation and runoff bands
-};
-
-// Map the function to the ImageCollection and clip to the ROI
-var precipCollection = agg.map(extractPrecipitation).toBands().clip(table);
+// Extract relevant precipitation bands and organize them as a multi-band image.
+// Clip the data to the ROI to focus only on the target region.
+var precipCollection = agg.map(function(image) {
+  return image.select(['total_precipitation_sum', 'runoff_sum']); // Extract desired bands
+}).toBands().clip(table); // Clip to ROI
 
 // --- Add Elevation and Terrain Data ---
-var elev = dem.clip(table); // Clip DEM data to the ROI for elevation
-var slope = ee.Terrain.slope(dem).clip(table); // Calculate and clip slope data
+// Incorporate elevation data and terrain derivatives like slope and topographic indices (TPI).
+// These features are essential for understanding the influence of terrain on flooding.
+var elev = dem.clip(table); // Elevation data clipped to ROI
+var slope = ee.Terrain.slope(dem).clip(table); // Slope data derived from elevation
 
-// Add elevation, slope, and other topographic indices (TPI) to the collection
+// Add these terrain features as additional bands to the precipitation collection.
 precipCollection = precipCollection
-    .addBands(elev, ['elevation'])
-    .addBands(slope, ['slope'])
-    .addBands(tpi_large, ['elevation'], false)
-    .addBands(tpi_small, ['elevation'], false);
+    .addBands(elev, ['elevation']) // Add elevation band
+    .addBands(slope, ['slope']) // Add slope band
+    .addBands(tpi_large, ['elevation'], false) // Add large-scale TPI
+    .addBands(tpi_small, ['elevation'], false); // Add small-scale TPI
 
-// Add land use/land cover (LULC) data to the collection
+// Add LULC data to the collection to incorporate land cover information.
+// This helps in understanding the relationship between land types and flooding.
 lulc_computed = lulc_computed.select(['label'], ['lulc']); // Rename 'label' band to 'lulc'
-precipCollection = precipCollection.addBands(lulc_computed, ['lulc'], false);
+precipCollection = precipCollection.addBands(lulc_computed, ['lulc'], false); // Add LULC band
 
-// --- Random Points for Sampling ---
-var randomPoints = ee.FeatureCollection.randomPoints(table, 10000); // Generate random points within ROI
+// --- Generate Random Sampling Points ---
+// Create random points within the ROI to use for training data generation.
+// These points allow for unbiased sampling of features across the region.
+var randomPoints = ee.FeatureCollection.randomPoints(table, 10000); // Generate 10,000 random points
 
-// Map through points and assign the value of the 'constant' band to each point
+// Assign values from the precipitation collection to the random points.
+// Each point is annotated with the value of the 'constant' band, representing flood presence.
 randomPoints = randomPoints.map(function(feature) {
   var value = precipCollection.select('constant').reduceRegion({
-    reducer: ee.Reducer.first(), // Extract the first pixel value
-    geometry: feature.geometry(),
-    scale: 30 // Scale of analysis (30m)
-  }).get('constant');
-  return feature.set('label', value); // Set the label property to the constant value
+    reducer: ee.Reducer.first(), // Extract the first available pixel value
+    geometry: feature.geometry(), // Use the geometry of the point
+    scale: 30 // Set analysis scale to 30 meters
+  }).get('constant'); // Retrieve the 'constant' value
+  return feature.set('label', value); // Set the label property to the retrieved value
 });
 
 // --- Generate Training Data ---
+// Sample the regions using the random points and extract features from the precipitation collection.
+// This creates a labeled dataset to train the classifier.
 var training = precipCollection.sampleRegions({
-  collection: randomPoints, // Use the random points for sampling
-  properties: ['label'], // Include the 'label' property
-  scale: 30 // Sampling scale
+  collection: randomPoints, // Use random points as sampling locations
+  properties: ['label'], // Include the 'label' property as the target variable
+  scale: 30 // Sampling resolution (30 meters)
 });
 
-// Map through training data and assign the 'constant' value to each feature
+// Ensure that each training feature has a label value by explicitly mapping through the features.
 training = training.map(function(feature) {
   var value = precipCollection.select('constant').reduceRegion({
     reducer: ee.Reducer.first(),
     geometry: feature.geometry(),
     scale: 30
   }).get('constant');
-  return feature.set('label', value);
+  return feature.set('label', value); // Assign the label property
 });
 
 // --- Train a Classifier ---
+// Define and train a Support Vector Machine (SVM) classifier using the training data.
+// The classifier learns to predict flood presence based on the input features.
 var classifier = ee.Classifier.libsvm({
-  kernelType: 'RBF', // Radial Basis Function kernel
+  kernelType: 'RBF', // Use Radial Basis Function kernel for non-linear classification
   gamma: 0.5, // Kernel coefficient
-  cost: 10 // Regularization parameter
+  cost: 10 // Regularization parameter to prevent overfitting
 });
-
-// Train the classifier using training data
 var trained = classifier.train(training, 'constant', precipCollection.bandNames());
 
 // --- Evaluate Classifier Performance ---
-var confusionMatrix = trained.confusionMatrix(); // Generate confusion matrix
-print('Confusion Matrix:', confusionMatrix); // Print confusion matrix to evaluate accuracy
+// Compute the confusion matrix to evaluate the accuracy of the trained classifier.
+// The confusion matrix provides insights into the classifier's prediction performance.
+var confusionMatrix = trained.confusionMatrix();
+print('Confusion Matrix:', confusionMatrix); // Display the confusion matrix
 
-// --- Classify Image ---
-var classified = precipCollection.select(precipCollection.bandNames()).classify(trained); // Classify the data
+// --- Classify Data ---
+// Apply the trained classifier to the precipitation collection to classify flood presence.
+// The output is a classified image where each pixel is labeled based on the classifier's prediction.
+var classified = precipCollection.select(precipCollection.bandNames()).classify(trained);
 
 // --- Display Results ---
-Map.addLayer(classified.selfMask(), { palette: 'red' }, "classified"); // Add classified result to the map
-Map.addLayer(classified.selfMask(), { palette: 'royalblue' }, 'Flood areas'); // Add another visualization for flood areas
-Map.addLayer(precipCollection.select('constant'), {}, "precipCollection"); // Display the collection
+// Visualize the classification results on the map.
+// Use different color palettes to distinguish between classified areas and flood zones.
+Map.addLayer(classified.selfMask(), { palette: 'red' }, "classified"); // Classified flood areas
+Map.addLayer(classified.selfMask(), { palette: 'royalblue' }, 'Flood areas'); // Another visualization for flood areas
+Map.addLayer(precipCollection.select('constant'), {}, "precipCollection"); // Display raw precipitation collection

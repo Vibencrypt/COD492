@@ -1,84 +1,69 @@
-// This file defines various input assets used in the analysis.
+// This script defines various input assets utilized in the flood analysis project.
 
-// 'table' refers to our region of interest.
+// Region of Interest (ROI) defined as a feature collection.
 var table = ee.FeatureCollection("projects/assets/COL865/geometry_box_export"),
 
-// 'dem' is a Digital Elevation Model (DEM) image from the USGS SRTM (Shuttle Radar Topography Mission).
-// It provides elevation data, useful for understanding terrain features like slopes, mountains, etc.
+// Digital Elevation Model (DEM) from the USGS Shuttle Radar Topography Mission (SRTM).
+// Provides elevation data to analyze terrain features such as slopes and mountains.
     dem = ee.Image("USGS/SRTMGL1_003"),
 
-// 'image2' is a flood image, likely captured from satellite or remote sensing, for flood analysis.
+// Flood image (version 2) captured via remote sensing for flood-related analysis.
     image2 = ee.Image("projects/assets/flood_image_roi_export_1Aug_edition2"),
 
-// 'image3' is another version of a flood image, possibly a refined or updated version for comparison.
+// Refined flood image (version 3) used for comparative analysis and accuracy improvement.
     image3 = ee.Image("projects/assets/flood_image_roi_export_aug1_v3"),
 
-// 'geometry' defines a complex geometry object consisting of both a point and a polygon.
-// The point is specified by its latitude and longitude, while the polygon is defined by a series of coordinates.
-// This geometry is used to mask or filter the region of interest for further analysis.
-    geometry =
-        /* color: #d63000 */
-        /* shown: false */
-        /* displayProperties: [
-          {
-            "type": "marker"
-          },
-          {
-            "type": "rectangle"
-          }
-        ] */
-        ee.Geometry({
-          "type": "GeometryCollection", // Geometry type is a collection of multiple geometries (point and polygon).
-          "geometries": [
+// Geometry object defining a point and a polygon for ROI masking and filtering.
+    geometry = ee.Geometry({
+        "type": "GeometryCollection", // Combines multiple geometries (point and polygon).
+        "geometries": [
             {
-              "type": "Point", // A single point geometry (latitude and longitude coordinates).
-              "coordinates": [
-                85.51537386399455, // Longitude
-                25.246062009713217 // Latitude
-              ]
+                "type": "Point", // Single point geometry with specific coordinates.
+                "coordinates": [
+                    85.51537386399455, // Longitude
+                    25.246062009713217  // Latitude
+                ]
             },
             {
-              "type": "Polygon", // A polygon geometry representing a rectangular area.
-              "coordinates": [
-                [
-                  [82.19000926266688, 26.257179132707943], // Polygon vertices (longitude, latitude)
-                  [82.19000926266688, 25.68432224106665],
-                  [83.92584910641688, 25.68432224106665],
-                  [83.92584910641688, 26.257179132707943]
-                ]
-              ],
-              "geodesic": false, // The polygon is defined using a flat plane (not geodesic).
-              "evenOdd": true // Indicates whether the polygon is using even-odd rule for inclusion.
+                "type": "Polygon", // Polygon geometry representing a rectangular area.
+                "coordinates": [
+                    [
+                        [82.19000926266688, 26.257179132707943], // Vertex 1 (longitude, latitude)
+                        [82.19000926266688, 25.68432224106665],  // Vertex 2
+                        [83.92584910641688, 25.68432224106665],  // Vertex 3
+                        [83.92584910641688, 26.257179132707943]   // Vertex 4
+                    ]
+                ],
+                "geodesic": false, // Defined on a flat plane (non-geodesic).
+                "evenOdd": true    // Inclusion determined by even-odd rule.
             }
-          ],
-          "coordinates": [] // No additional coordinates are specified for this geometry collection.
-        }),
+        ]
+    }),
 
-// 'prec' is an image collection containing daily precipitation data from the ECMWF ERA5 model.
-// ERA5 provides historical weather data, including precipitation, temperature, etc.
+// Daily precipitation data from the ECMWF ERA5 model.
+// Useful for analyzing weather patterns, including rainfall intensity and duration.
     prec = ee.ImageCollection("ECMWF/ERA5/DAILY"),
 
-// 'lulc' is an image collection representing Land Use/Land Cover (LULC) data, which maps land types.
-// This data is sourced from the Google Dynamic World dataset, which classifies land cover into various categories.
+// Land Use/Land Cover (LULC) data from the Google Dynamic World dataset.
+// Provides classifications of land types, aiding in environmental analysis.
     lulc = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1"),
 
-// 'aug13' is a specific flood image for August 13, used for analysis at that point in time.
+// Flood image for August 13, 2023, used for temporal flood event analysis.
     aug13 = ee.Image("projects/assets/flood_image_roi_export_13aug"),
 
-// 'aug25' is another flood image for August 25, representing a different time point for flood monitoring.
+// Flood image for August 25, 2023, representing another time point for flood monitoring.
     aug25 = ee.Image("projects/assets/flood_image_roi_export_25Aug"),
 
-// 'tpi_large' represents a terrain ruggedness index (TPI) image for a large region.
-// TPI is used to measure the ruggedness of terrain, which can be useful for flood modeling, slope analysis, etc.
+// Terrain Position Index (TPI) for a large region.
+// Indicates terrain ruggedness, aiding in slope and flood modeling.
     tpi_large = ee.Image("projects/assets/TPI_large_roi"),
 
-// 'tpi_small' represents a smaller region of the terrain ruggedness index (TPI), providing similar information but for a more localized area.
+// TPI for a smaller region, providing localized terrain ruggedness data.
     tpi_small = ee.Image("projects/assets/COL865/TPI_small_region"),
 
-// 'imageCollection' is an image collection containing daily aggregated data from the ECMWF ERA5-LAND dataset.
-// This collection is likely used for temporal analysis of land variables such as temperature, precipitation, etc.
+// Daily aggregated data from ECMWF ERA5-LAND dataset.
+// Contains land variables such as temperature and precipitation for temporal analysis.
     imageCollection = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR"),
 
-// 'lulc_computed' represents a specific LULC image computed from the Dynamic World dataset,
-// showing the land use/land cover classification for a particular region or time.
+// Pre-computed LULC image from the Dynamic World dataset for a specific region and time.
     lulc_computed = ee.Image("projects/assets/COL865/lulc_dynamic_world");
